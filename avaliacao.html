@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  SEG BRASIL MANGABEIRA — Página de Avaliações de Clientes
+  ============================================================
+  COMO CONFIGURAR (Supabase):
+
+  1) Crie um projeto em https://supabase.com (gratuito).
+  2) Vá em "SQL Editor" e rode o script abaixo para criar a tabela:
+
+     create table avaliacoes (
+       id uuid primary key default gen_random_uuid(),
+       nome text not null,
+       estrelas int not null check (estrelas >= 1 and estrelas <= 5),
+       comentario text not null,
+       criado_em timestamptz not null default now()
+     );
+
+     alter table avaliacoes enable row level security;
+
+     create policy "Qualquer pessoa pode ler avaliacoes"
+       on avaliacoes for select
+       using (true);
+
+     create policy "Qualquer pessoa pode inserir avaliacoes"
+       on avaliacoes for insert
+       with check (true);
+
+  3) Vá em "Project Settings" > "API" e copie:
+     - Project URL
+     - anon public key
+
+  4) Ative o Realtime para a tabela (para as avaliações aparecerem na
+     hora para todo mundo, sem precisar recarregar a página):
+     - Vá em "Database" > "Replication" > clique na tabela "avaliacoes"
+       e ative o toggle. OU rode no SQL Editor:
+
+     alter publication supabase_realtime add table avaliacoes;
+
+  5) Cole os dois valores copiados no passo 3 nas constantes
+     SUPABASE_URL e SUPABASE_ANON_KEY logo abaixo, na tag <script>.
+
+  6) Salve e abra o arquivo .html no navegador (ou hospede onde preferir).
+  ============================================================
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Avalie a Seg Brasil Mangabeira</title>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-17935707647"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-17935707647');
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-deep:#0b2545;
+    --navy:#153e75;
+    --navy-light:#2f6bb0;
+    --gold:#f0ab1a;
+    --gold-light:#ffd873;
+    --gold-deep:#c98a0a;
+    --ink:#20242b;
+    --paper:#f5f7fb;
+    --card:#ffffff;
+    --line:#e3e8f0;
+    --muted:#6b7688;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden;}
+
+  body{
+    font-family:'Poppins', sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 15% 0%, rgba(47,107,176,0.10), transparent 45%),
+      radial-gradient(circle at 100% 20%, rgba(240,171,26,0.10), transparent 40%),
+      var(--paper);
+    min-height:100vh;
+    padding:clamp(16px, 4vw, 40px) clamp(12px, 4vw, 16px) 50px;
+    display:flex;
+    justify-content:center;
+  }
+
+  .page{
+    width:100%;
+    max-width:640px;
+    min-width:0;
+  }
+
+  /* ---------- Header / Logo ---------- */
+  .brand{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    margin-bottom:28px;
+  }
+  .brand img{
+    width:110px;
+    height:110px;
+    object-fit:contain;
+    border-radius:22px;
+    filter:drop-shadow(0 6px 14px rgba(11,37,69,0.18));
+  }
+  .brand .tagline{
+    margin-top:6px;
+    font-family:'Barlow Condensed', sans-serif;
+    letter-spacing:2.5px;
+    text-transform:uppercase;
+    font-size:13px;
+    font-weight:600;
+    color:var(--muted);
+  }
+
+  /* ---------- Hero band ---------- */
+  .hero{
+    position:relative;
+    background:linear-gradient(120deg, var(--navy-deep) 0%, var(--navy) 55%, var(--navy-light) 100%);
+    border-radius:20px;
+    padding:clamp(20px, 5vw, 28px) clamp(18px, 5vw, 26px);
+    color:#fff;
+    overflow:hidden;
+    margin-bottom:22px;
+  }
+  .hero::after{
+    content:"";
+    position:absolute;
+    right:-40px;
+    bottom:-60px;
+    width:220px;
+    height:220px;
+    background:radial-gradient(circle, rgba(240,171,26,0.35), transparent 70%);
+  }
+  .hero h1{
+    margin:0 0 6px;
+    font-size:clamp(18px, 4.8vw, 22px);
+    font-weight:700;
+    position:relative;
+    z-index:1;
+  }
+  .hero p{
+    margin:0;
+    font-size:clamp(13px, 3.4vw, 14px);
+    line-height:1.5;
+    color:rgba(255,255,255,0.85);
+    max-width:46ch;
+    position:relative;
+    z-index:1;
+  }
+  .hero .swoosh{
+    position:absolute;
+    top:0; left:0; right:0; bottom:0;
+    background:linear-gradient(90deg, transparent, rgba(240,171,26,0.12) 60%, transparent);
+    pointer-events:none;
+  }
+
+  /* ---------- Summary ---------- */
+  .summary{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:12px 16px;
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:16px clamp(14px, 4vw, 20px);
+    margin-bottom:22px;
+  }
+  .summary .avg{
+    font-family:'Barlow Condensed', sans-serif;
+    font-size:clamp(34px, 8vw, 42px);
+    font-weight:700;
+    color:var(--navy);
+    line-height:1;
+  }
+  .summary .avg-details{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:0;
+  }
+  .summary .stars-static{
+    color:var(--gold);
+    font-size:16px;
+    letter-spacing:2px;
+  }
+  .summary .count{
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  /* ---------- Form card ---------- */
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:clamp(18px, 5vw, 26px);
+    box-shadow:0 10px 30px rgba(11,37,69,0.06);
+    margin-bottom:30px;
+    min-width:0;
+  }
+  .card h2{
+    margin:0 0 4px;
+    font-size:18px;
+    font-weight:700;
+    color:var(--navy-deep);
+  }
+  .card .sub{
+    margin:0 0 20px;
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink);
+    margin-bottom:6px;
+  }
+
+  input[type="text"], textarea{
+    width:100%;
+    font-family:'Poppins', sans-serif;
+    font-size:16px;
+    padding:12px 14px;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    background:#fbfcfe;
+    color:var(--ink);
+    resize:vertical;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type="text"]:focus, textarea:focus{
+    outline:none;
+    border-color:var(--navy-light);
+    box-shadow:0 0 0 3px rgba(47,107,176,0.15);
+  }
+
+  .field{ margin-bottom:18px; }
+
+  .stars-input{
+    display:flex;
+    flex-direction:row-reverse;
+    justify-content:flex-end;
+    flex-wrap:wrap;
+    gap:6px;
+    font-size:clamp(28px, 8vw, 34px);
+    line-height:1;
+  }
+  .stars-input input{
+    position:absolute;
+    opacity:0;
+    width:0;
+    height:0;
+  }
+  .stars-input label{
+    cursor:pointer;
+    color:#d7dce4;
+    transition:transform .1s ease, color .15s ease;
+    user-select:none;
+  }
+  .stars-input label:hover{ transform:scale(1.08); }
+  .stars-input input:checked ~ label,
+  .stars-input label:hover,
+  .stars-input label:hover ~ label{
+    color:var(--gold);
+  }
+  .stars-hint{
+    font-size:12px;
+    color:var(--muted);
+    margin-top:4px;
+    min-height:16px;
+  }
+
+  button.submit{
+    width:100%;
+    border:none;
+    cursor:pointer;
+    padding:14px 20px;
+    border-radius:12px;
+    font-family:'Poppins', sans-serif;
+    font-size:15px;
+    font-weight:700;
+    color:var(--navy-deep);
+    background:linear-gradient(100deg, var(--gold-light), var(--gold) 60%, var(--gold-deep));
+    box-shadow:0 8px 20px rgba(240,171,26,0.35);
+    transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+  }
+  button.submit:hover{ transform:translateY(-1px); box-shadow:0 10px 24px rgba(240,171,26,0.45); }
+  button.submit:disabled{ opacity:.6; cursor:not-allowed; transform:none; }
+
+  .msg{
+    margin-top:12px;
+    font-size:13px;
+    font-weight:600;
+    padding:10px 12px;
+    border-radius:8px;
+    display:none;
+  }
+  .msg.ok{
+    display:block;
+    background:#e9f7ee;
+    color:#1e7a41;
+    border:1px solid #bfe8cd;
+  }
+  .msg.err{
+    display:block;
+    background:#fdecec;
+    color:#b3261e;
+    border:1px solid #f5c2c0;
+  }
+
+  /* ---------- Reviews list ---------- */
+  .reviews h2{
+    font-size:17px;
+    font-weight:700;
+    color:var(--navy-deep);
+    margin:0 0 14px 4px;
+  }
+  .review{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px clamp(14px, 4vw, 18px);
+    margin-bottom:12px;
+    min-width:0;
+  }
+  .review .row-top{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:4px 10px;
+    margin-bottom:6px;
+  }
+  .review .nome{
+    font-weight:700;
+    font-size:14px;
+    color:var(--ink);
+    word-break:break-word;
+  }
+  .review .data{
+    font-size:11.5px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+  .review .stars{
+    color:var(--gold);
+    font-size:14px;
+    letter-spacing:1.5px;
+    margin-bottom:6px;
+  }
+  .review .texto{
+    font-size:13.5px;
+    line-height:1.55;
+    color:#3c4353;
+    margin:0;
+  }
+
+  .empty, .loading{
+    text-align:center;
+    font-size:13px;
+    color:var(--muted);
+    padding:24px 10px;
+  }
+
+  footer{
+    text-align:center;
+    margin-top:26px;
+    font-size:11.5px;
+    color:var(--muted);
+  }
+
+  @media (max-width:480px){
+    body{ padding-left:12px; padding-right:12px; }
+    .brand img{ width:88px; height:88px; }
+    .summary{ gap:10px 14px; }
+    .review .data{ font-size:11px; }
+  }
+
+  @media (max-width:360px){
+    .stars-input{ gap:4px; }
+    button.submit{ font-size:14px; padding:13px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="brand">
+    <img src="assets/images/logo-segbrasil-mangabeira.png" alt="Seg Brasil Mangabeira">
+    <div class="tagline">Proteção Veicular</div>
+  </div>
+
+  <div class="hero">
+    <div class="swoosh"></div>
+    <h1>O que você achou da nossa proteção?</h1>
+    <p>Conte pra gente como foi sua experiência com a Seg Brasil Mangabeira. Sua avaliação ajuda outros associados a confiarem no nosso trabalho.</p>
+  </div>
+
+  <div class="summary" id="summaryBox">
+    <div class="avg" id="avgNumber">–</div>
+    <div class="avg-details">
+      <div class="stars-static" id="avgStars">☆☆☆☆☆</div>
+      <div class="count" id="countText">Ainda sem avaliações</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Deixe sua avaliação</h2>
+    <p class="sub">Preencha os campos abaixo, leva menos de um minuto.</p>
+
+    <form id="reviewForm">
+      <div class="field">
+        <label for="nome">Seu nome</label>
+        <input type="text" id="nome" placeholder="Ex: Maria Souza" required maxlength="80">
+      </div>
+
+      <div class="field">
+        <label>Sua nota</label>
+        <div class="stars-input" id="starsInput">
+          <input type="radio" id="estrela5" name="estrelas" value="5"><label for="estrela5">★</label>
+          <input type="radio" id="estrela4" name="estrelas" value="4"><label for="estrela4">★</label>
+          <input type="radio" id="estrela3" name="estrelas" value="3"><label for="estrela3">★</label>
+          <input type="radio" id="estrela2" name="estrelas" value="2"><label for="estrela2">★</label>
+          <input type="radio" id="estrela1" name="estrelas" value="1"><label for="estrela1">★</label>
+        </div>
+        <div class="stars-hint" id="starsHint">Toque nas estrelas para avaliar</div>
+      </div>
+
+      <div class="field">
+        <label for="comentario">Seu comentário</label>
+        <textarea id="comentario" rows="4" placeholder="Conte como foi sua experiência..." required maxlength="600"></textarea>
+      </div>
+
+      <button type="submit" class="submit" id="submitBtn">Enviar avaliação</button>
+      <div class="msg" id="formMsg"></div>
+    </form>
+  </div>
+
+  <div class="reviews">
+    <h2>O que nossos associados dizem</h2>
+    <div id="reviewsList">
+      <div class="loading">Carregando avaliações...</div>
+    </div>
+  </div>
+
+  <footer>Seg Brasil Mangabeira · Avaliações de clientes</footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  // =========================================================
+  // CONFIGURE AQUI seus dados do Supabase (veja instruções no
+  // topo deste arquivo, no comentário HTML).
+  // =========================================================
+  const SUPABASE_URL = "https://vpsiuhhyocpfkmmrkmlu.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_BwxpeNtO3LrqD-PQPdrkqA_WkCZXGEO";
+
+  const isConfigured = !SUPABASE_URL.includes("SUA_URL") && !SUPABASE_ANON_KEY.includes("SUA_CHAVE");
+  const supabaseClient = isConfigured
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  // ---------- Estrelas do formulário ----------
+  const starsInput = document.getElementById('starsInput');
+  const starsHint = document.getElementById('starsHint');
+
+  starsInput.addEventListener('change', (e) => {
+    if(e.target.name === 'estrelas'){
+      starsHint.textContent = e.target.value + " de 5 estrelas";
+    }
+  });
+
+  function getNotaSelecionada(){
+    const marcada = starsInput.querySelector('input[name="estrelas"]:checked');
+    return marcada ? Number(marcada.value) : 0;
+  }
+
+  // ---------- Envio do formulário ----------
+  const form = document.getElementById('reviewForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const formMsg = document.getElementById('formMsg');
+
+  function mostrarMensagem(texto, tipo){
+    formMsg.textContent = texto;
+    formMsg.className = 'msg ' + tipo;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    formMsg.className = 'msg';
+
+    const nome = document.getElementById('nome').value.trim();
+    const comentario = document.getElementById('comentario').value.trim();
+
+    if(!nome || !comentario){
+      mostrarMensagem("Preencha seu nome e comentário.", "err");
+      return;
+    }
+    const nota = getNotaSelecionada();
+    if(nota === 0){
+      mostrarMensagem("Escolha uma quantidade de estrelas.", "err");
+      return;
+    }
+    if(!isConfigured){
+      mostrarMensagem("O Supabase ainda não foi configurado nesta página (veja o comentário no topo do arquivo HTML).", "err");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Enviando...";
+
+    const { error } = await supabaseClient
+      .from('avaliacoes')
+      .insert([{ nome: nome, estrelas: nota, comentario: comentario }]);
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Enviar avaliação";
+
+    if(error){
+      console.error(error);
+      mostrarMensagem("Não foi possível enviar sua avaliação. Tente novamente.", "err");
+      return;
+    }
+
+    mostrarMensagem("Obrigado! Sua avaliação foi enviada com sucesso.", "ok");
+    form.reset();
+    starsHint.textContent = "Toque nas estrelas para avaliar";
+
+    carregarAvaliacoes();
+  });
+
+  // ---------- Carregar e exibir avaliações ----------
+  function estrelasParaTexto(qtd){
+    return "★".repeat(qtd) + "☆".repeat(5 - qtd);
+  }
+
+  function formatarData(iso){
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  async function carregarAvaliacoes(){
+    const listEl = document.getElementById('reviewsList');
+
+    if(!isConfigured){
+      listEl.innerHTML = '<div class="empty">Configure o Supabase para exibir as avaliações aqui.</div>';
+      return;
+    }
+
+    const { data, error } = await supabaseClient
+      .from('avaliacoes')
+      .select('*')
+      .order('criado_em', { ascending: false });
+
+    if(error){
+      console.error(error);
+      listEl.innerHTML = '<div class="empty">Não foi possível carregar as avaliações.</div>';
+      return;
+    }
+
+    // Resumo (média e contagem)
+    const avgNumber = document.getElementById('avgNumber');
+    const avgStars = document.getElementById('avgStars');
+    const countText = document.getElementById('countText');
+
+    if(!data || data.length === 0){
+      avgNumber.textContent = "–";
+      avgStars.textContent = "☆☆☆☆☆";
+      countText.textContent = "Ainda sem avaliações";
+      listEl.innerHTML = '<div class="empty">Seja o primeiro a avaliar a Seg Brasil Mangabeira!</div>';
+      return;
+    }
+
+    const media = data.reduce((soma, r) => soma + r.estrelas, 0) / data.length;
+    avgNumber.textContent = media.toFixed(1);
+    avgStars.textContent = estrelasParaTexto(Math.round(media));
+    countText.textContent = data.length + (data.length === 1 ? " avaliação" : " avaliações");
+
+    listEl.innerHTML = data.map(r => `
+      <div class="review">
+        <div class="row-top">
+          <span class="nome">${escapeHtml(r.nome)}</span>
+          <span class="data">${formatarData(r.criado_em)}</span>
+        </div>
+        <div class="stars">${estrelasParaTexto(r.estrelas)}</div>
+        <p class="texto">${escapeHtml(r.comentario)}</p>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  carregarAvaliacoes();
+
+  // ---------- Tempo real: qualquer avaliação nova aparece na hora ----------
+  // (para todo mundo que estiver com a página aberta, não só para quem enviou)
+  if(isConfigured){
+    supabaseClient
+      .channel('avaliacoes-ao-vivo')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'avaliacoes' },
+        () => carregarAvaliacoes()
+      )
+      .subscribe();
+  }
+})();
+</script>
+</body>
+</html>
